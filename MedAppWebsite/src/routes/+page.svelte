@@ -6,6 +6,7 @@
         am: boolean;
         pm: boolean;
     }
+    
     let baseUrl = 'http://medappapi.dandland.com/meds';
     //let baseUrl = 'http://localhost:5063/meds';
     
@@ -17,7 +18,20 @@
     );
 
     const request = $derived.by(async () => {
-        const res = await fetch(`${baseUrl}/${dtString}`);
+        // const res = await fetch(`${baseUrl}/${dtString}`);
+        let medRecord: MedRecord;           
+        const res = await fetch(`${baseUrl}`, 
+        {
+            method: 'GET',
+            // rmode: 'cors', // This is the default; it tells the browser to check for CORS headers
+            // credentials: 'include', // Use this if you need to send cookies or Windows Auth
+            headers: 
+            {
+              'Content-Type': 'application/json',
+              'X-DandlandOnly':'dandlandonly'
+            }
+            // body: JSON.stringify(medData)
+        });
         console.log(`date ${dtString}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         record =await res.json() as MedRecord;
@@ -48,9 +62,12 @@
             const response = await fetch(`${baseUrl}`, 
             {
                 method: 'PUT',
+                //mode: 'cors', // This is the default; it tells the browser to check for CORS headers
+                // credentials: 'include', // Use this if you need to send cookies or Windows Auth            
                 headers: 
                 {
-                  'Content-Type': 'application/json'
+                  'Content-Type': 'application/json',
+                  'X-DandlandOnly':'dandlandonly'
                 },
                 body: JSON.stringify(medData)
             });
@@ -74,7 +91,22 @@
         const dateChange = async() =>
         {            
             console.log(`webdate changed... [${webDate}]`);
-            const res = await fetch(`${baseUrl}/${webDate}`);
+            // const res = await fetch(`${baseUrl}/${webDate}`);
+                     
+            const res = await fetch(`${baseUrl}`, 
+            {
+                method: 'PUT',
+                //mode: 'cors', // This is the default; it tells the browser to check for CORS headers
+                // credentials: 'include', // Use this if you need to send cookies or Windows Auth                
+                headers: 
+                {
+                  'Content-Type': 'application/json',
+                  'X-DandlandOnly':'dandlandonly'
+                },
+                body: JSON.stringify(medData)
+            });
+            
+            
             console.log(`date ${dtString}`);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             console.table(record);

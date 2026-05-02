@@ -1,11 +1,13 @@
 
 using System;
-using Microsoft.AspNetCore.Http;
+using System.Numerics;
+using System.Text.RegularExpressions;
+using Azure;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.Text.RegularExpressions;
-using System.Numerics;
 
 namespace MedAppApi
 {
@@ -36,12 +38,89 @@ namespace MedAppApi
                 options.AddPolicy( "AllowFrontend", policy =>
                 {
                     policy.AllowAnyOrigin()
+                    //policy.WithOrigins(
+                    //"http://dandland.com",
+                    //"http://medapp.dandland.com",
+                    //"http://medappapi.dandland.com",
+                    //"http://localhost:3000",
+                    //"http://localhost:5173",
+                    //"http://localhost:5063/",
+                    //"http://localhost:5063/swagger/",
+                    //"http://localhost:5063/swagger",
+                    //"http://localhost:5063/swagger/index.html",
+                    //"localhost:5063",
+                    //"http://localhost:5063",
+                    //"[::1]:5063",
+                    //"http://localhost:5063/meds",
+                    //"http://localhost:5063/favicon.ico")
                     .AllowAnyHeader()
                     .AllowAnyMethod();
                 } );
             } );
 
-            var app = builder.Build();             
+            var app = builder.Build();
+
+            // GLOBAL GUARD
+            app.Use( async ( context, next ) =>
+            {
+                Console.WriteLine("In Use...");
+                const string HeaderName = "X-DandlandOnly"; // Name of header
+                const string SecretValue = "dandlandonly";        // Value to check
+
+                var referer = context.Request.Headers["Referer"].ToString();
+
+                // Check if the request is originating from the swagger page
+                bool isSwagger = referer.Contains("/swagger/index.html") ||
+                     context.Request.Path.StartsWithSegments("/swagger");
+
+                if(isSwagger)
+                {
+                    Console.WriteLine("Swagger client...  Don't block");
+                    await next(); // Let the request continue to your MapGet/MapPost    
+                    return;
+                }
+
+                if(HttpMethods.IsOptions( context.Request.Method ))
+                {
+                    await next();
+                    return;
+                }
+
+                Console.WriteLine($"{context.Request.Headers.Origin}");
+//
+//                  if( context.Request.Headers.Origin == "http://localhost:3000")
+//                  {
+//                      Console.WriteLine("Localhost... ok");
+//                      await next();
+//                      return; 
+//                  }
+//  
+
+
+                if(!context.Request.Headers.TryGetValue( HeaderName, out var extractedValue ) ||
+                    extractedValue != SecretValue)
+                {
+                    Console.WriteLine("Ooops!  Big trouble Little china...");
+                    Console.WriteLine($"{HeaderName} == [{extractedValue}]");
+                    context.Response.StatusCode = 401;
+                    await context.Response.WriteAsync( "Unauthorized: Missing or invalid secret." );
+                    return; // Stop the request here!
+                }
+
+                if(context.Request.Headers.Origin == "http://localhost:3000")
+                {
+                    Console.WriteLine( "Localhost... ok" );
+                    await next();
+                    return;
+                }
+
+
+
+                Console.WriteLine("Made it through use...");
+                await next(); // Let the request continue to your MapGet/MapPost
+            } );
+
+
             app.UseCors("AllowFrontend");
 
             // Configure the HTTP request pipeline.
@@ -73,6 +152,11 @@ namespace MedAppApi
             app.MapGet( "/meds/{dateValue?}", async ( string? dateValue, AppDbContext db ) =>
             {   
                 DateTime dtSearchDate = DateTime.Now;
+
+                if( string.IsNullOrWhiteSpace(dateValue))
+                {
+                    dateValue = "";
+                }
 
                 Match m = reDate.Match(dateValue) ;
 
