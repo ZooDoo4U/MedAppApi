@@ -6,159 +6,110 @@
         am: boolean;
         pm: boolean;
     }
-    
-    let baseUrl = 'http://medappapi.dandland.com/meds';
-    //let baseUrl = 'http://localhost:5063/meds';
-    
-    let dt = $state(new Date());
-    let record: MedRecord | undefined = $state(undefined);
-    let webDate:string =  $state("");
-    let dtString = $derived(
-        `${dt.getFullYear()}-${dt.getMonth() + 1}-${dt.getDate()}`
-    );
 
-    const request = $derived.by(async () => 
-    {           
-        let medRecord: MedRecord;           
-        const res = await fetch(`${baseUrl}`, 
+    const baseUrl = 'http://medappapi.dandland.com/meds';
+    
+    // 1. State: The source of truth is the date string
+    let webDate = $state(new Date().toISOString().split('T')[0]);
+    
+    // 2. Reactive Data Fetching: 
+    // This automatically re-runs whenever 'webDate' changes.
+    let recordPromise = $derived.by(() => fetchRecord(webDate));
+
+    async function fetchRecord(date: string) 
+    {
+        const res = await fetch(`${baseUrl}/${date}`, 
         {
-            method: 'GET',
-            // rmode: 'cors', // This is the default; it tells the browser to check for CORS headers
-            // credentials: 'include', // Use this if you need to send cookies or Windows Auth
             headers: 
             {
-              'Content-Type': 'application/json',
-              'X-DandlandOnly':'dandlandonly'
-            }     
+                'X-DandlandOnly': 'dandlandonly' 
+            }
         });
-                
-        if (!res.ok)
-        {
-            throw new Error(`HTTP ${res.status}`);            
+        if (!res.ok){
+            throw new Error(`Could not fetch record for ${date}`);            
         } 
-        record =await res.json() as MedRecord;        
-        webDate= `${record.medDate?.split('T')[0]}`;      
-        return record;
-    });
-    
-    const valueChanged = async () =>
+        return await res.json() as MedRecord;
+    }
+
+    // 3. Update Function:
+    // We pass the current record to the function to keep it clean.
+    async function updateRecord(record: MedRecord) 
     {
         try 
-        {    
-            let medData: MedRecord  = 
-            {
-                description: record.description,
-                id: record.id,
-                medDate: record.medDate,
-                am:record.am,
-                pm:record.pm               
-            }          
-              
-            const response = await fetch(`${baseUrl}`, 
+        {
+            const response = await fetch(baseUrl, 
             {
                 method: 'PUT',
-                //mode: 'cors', // This is the default; it tells the browser to check for CORS headers
-                // credentials: 'include', // Use this if you need to send cookies or Windows Auth            
-                headers: 
-                {
-                  'Content-Type': 'application/json',
-                  'X-DandlandOnly':'dandlandonly'
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-DandlandOnly': 'dandlandonly'
                 },
-                body: JSON.stringify(medData)
+                body: JSON.stringify(record)
             });
-                    
-            if (response.ok) 
-            {                
-                record = medData;
-            }
-            else 
+            
+            if (!response.ok) 
             {
-                console.error('Update failed:', response.statusText);                
-            } 
-        }
+                console.error('Update failed');
+            }
+        } 
         catch (error) 
         {
             console.error('Network error:', error);
         }
-      }
-  
-        const dateChange = async () => 
-        {
-            // 1. Fix the URL (added the slash)
-            const res = await fetch(`${baseUrl}/${webDate}`, 
-            {
-                method: 'GET', // Should this be GET? Usually fetching a record by date is GET
-                headers: 
-                {
-                    'Content-Type': 'application/json',
-                    'X-DandlandOnly': 'dandlandonly'
-                }
-            });       
-            
-            if (res.ok) 
-            {
-                const tmpRecord = await res.json();
-                // 2. Reassign the whole object to ensure Svelte sees the change
-                record = tmpRecord; 
-            }
-        };
-//        const dateChange = async() =>
-//        {          
-//            console.table(webDate);             
-//            const res = await fetch(`${baseUrl}/${webDate}`, 
-//            {
-//                method: 'PUT',
-//                //mode: 'cors', // This is the default; it tells the browser to check for CORS headers
-//                // credentials: 'include', // Use this if you need to send cookies or Windows Auth                
-//                headers: 
-//                {
-//                  'Content-Type': 'application/json',
-//                  'X-DandlandOnly':'dandlandonly'
-//                },
-//                body: JSON.stringify(medData)
-//            });            
-//                        
-//            if (!res.ok)
-//            {
-//                throw new Error(`HTTP ${res.status}`);                
-//            } 
-//            let tmpRecord:MedRecord =await res.json() as MedRecord;
-//            record.id  = tmpRecord.id;
-//            record.description  = tmpRecord.description;
-//            record.medDate  = tmpRecord?.medDate;
-//            record.am  = tmpRecord.am;
-//            record.pm  = tmpRecord.pm;           
-//            // webDate= `${record.medDate?.split('T')[0]}`;            
-//            return record;
-//        }
+    }
     
 </script>
 
-{#await request}
-    <p>Loading...</p>
-{:then _}
-    <div>
-        <label for='description'>Description</label>
-        <input id='description' type="text" bind:value={record.description} onchange={valueChanged} />
-    </div>
+{#await recordPromise}
+    <p>Loading record for {webDate}...</p>
+{:then record}
+    <div class="form">
+        <div>
+            <label for='dateValue'>Log Date</label>
+            <!-- Changing this triggers 'recordPromise' to re-run automatically -->
+            <input id="dateValue" type="date" bind:value={webDate} />
+        </div>
+        
+        <div>
+            <label for='description'>Description</label>
+            <input id='description' type="text" bind:value={record.description} onchange={() => updateRecord(record)} 
+            />
+        </div>
 
-    <div>
-        <label for='dateValue'>Log Date</label>
-        <input id="dateValue" type="date" bind:value={webDate} onchange={dateChange}/>
-    </div>
+        <div>
+            <label for='am'>AM:</label>
+            <input id='am' type="checkbox" bind:checked={record.am} onchange={() => updateRecord(record)} 
+            />
+        </div>
 
-    <div>
-        <label for='am'>AM:</label>
-        <input id='am'type="checkbox" bind:checked={record.am} onchange={valueChanged} />
+        <div>
+            <label for='pm'>PM:</label>
+            <input id='pm' type="checkbox" bind:checked={record.pm} onchange={() => updateRecord(record)} 
+            />
+        </div>
     </div>
-
-    <div>
-        <label for='pm'>PM:</label>
-        <input id='pm' type="checkbox" bind:checked={record.pm} onchange={valueChanged} />
-    </div>
-
 {:catch err}
-    <p style="color:red">Error: {err.message}</p>
+    <div>
+        <p style="color:red">{err.message}</p>
+        <label>Try another date: </label>
+        <input type="date" bind:value={webDate} />
+    </div>
 {/await}
 
- 
+<style>
+    .form 
+    { 
+        display: flex; 
+        flex-direction: column; 
+        gap: 1rem; 
+        margin-top: 1rem; 
+    }
+    
+    hr 
+    { 
+        width: 100%; 
+        border: 0; 
+        border-top: 1px solid #ccc; 
+    }
+    
+</style>
