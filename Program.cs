@@ -24,7 +24,7 @@ namespace MedAppApi
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
-            //builder.Services.AddOpenApi("internal");
+            
 
             // This tells the framework: "AppDbContext is a Service, NOT something to look for in the body"
             builder.Services.AddDbContext<AppDbContext>( options =>
@@ -38,21 +38,6 @@ namespace MedAppApi
                 options.AddPolicy( "AllowFrontend", policy =>
                 {
                     policy.AllowAnyOrigin()
-                    //policy.WithOrigins(
-                    //"http://dandland.com",
-                    //"http://medapp.dandland.com",
-                    //"http://medappapi.dandland.com",
-                    //"http://localhost:3000",
-                    //"http://localhost:5173",
-                    //"http://localhost:5063/",
-                    //"http://localhost:5063/swagger/",
-                    //"http://localhost:5063/swagger",
-                    //"http://localhost:5063/swagger/index.html",
-                    //"localhost:5063",
-                    //"http://localhost:5063",
-                    //"[::1]:5063",
-                    //"http://localhost:5063/meds",
-                    //"http://localhost:5063/favicon.ico")
                     .AllowAnyHeader()
                     .AllowAnyMethod();
                 } );
@@ -63,20 +48,19 @@ namespace MedAppApi
             // GLOBAL GUARD
             app.Use( async ( context, next ) =>
             {
-                Console.WriteLine("In Use...");
-                const string HeaderName = "X-DandlandOnly"; // Name of header
-                const string SecretValue = "dandlandonly";        // Value to check
+                
+                const string HeaderName = "X-DandlandOnly"; 
+                const string SecretValue = "dandlandonly";  
 
                 var referer = context.Request.Headers["Referer"].ToString();
-
-                // Check if the request is originating from the swagger page
+                
                 bool isSwagger = referer.Contains("/swagger/index.html") ||
                      context.Request.Path.StartsWithSegments("/swagger");
 
                 if(isSwagger)
                 {
                     Console.WriteLine("Swagger client...  Don't block");
-                    await next(); // Let the request continue to your MapGet/MapPost    
+                    await next();
                     return;
                 }
 
@@ -86,17 +70,6 @@ namespace MedAppApi
                     return;
                 }
 
-                Console.WriteLine($"{context.Request.Headers.Origin}");
-//
-//                  if( context.Request.Headers.Origin == "http://localhost:3000")
-//                  {
-//                      Console.WriteLine("Localhost... ok");
-//                      await next();
-//                      return; 
-//                  }
-//  
-
-
                 if(!context.Request.Headers.TryGetValue( HeaderName, out var extractedValue ) ||
                     extractedValue != SecretValue)
                 {
@@ -104,7 +77,7 @@ namespace MedAppApi
                     Console.WriteLine($"{HeaderName} == [{extractedValue}]");
                     context.Response.StatusCode = 401;
                     await context.Response.WriteAsync( "Unauthorized: Missing or invalid secret." );
-                    return; // Stop the request here!
+                    return;
                 }
 
                 if(context.Request.Headers.Origin == "http://localhost:3000")
@@ -114,10 +87,8 @@ namespace MedAppApi
                     return;
                 }
 
-
-
                 Console.WriteLine("Made it through use...");
-                await next(); // Let the request continue to your MapGet/MapPost
+                await next();
             } );
 
 
@@ -127,8 +98,7 @@ namespace MedAppApi
             if(app.Environment.IsDevelopment())
             {
                 app.UseSwagger();
-                app.UseSwaggerUI();
-            //    app.MapOpenApi("/docs/internal.json");
+                app.UseSwaggerUI();            
             }
 
             app.UseAuthorization();
@@ -146,8 +116,6 @@ namespace MedAppApi
                 return await db.MedTable.ToListAsync();
             });
 
-
-
             //Read
             app.MapGet( "/meds/{dateValue?}", async ( string? dateValue, AppDbContext db ) =>
             {   
@@ -155,7 +123,7 @@ namespace MedAppApi
 
                 if( string.IsNullOrWhiteSpace(dateValue))
                 {
-                    dateValue = "";
+                    dateValue = $"{dtSearchDate.Year}-{dtSearchDate.Month}-{dtSearchDate.Day}";
                 }
 
                 Match m = reDate.Match(dateValue) ;
@@ -201,7 +169,6 @@ namespace MedAppApi
                     db.MedTable.Add( t );
                     try
                     {
-
                         db.SaveChanges();
                     }
                     catch(Exception ex)

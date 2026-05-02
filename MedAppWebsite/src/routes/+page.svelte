@@ -17,8 +17,8 @@
         `${dt.getFullYear()}-${dt.getMonth() + 1}-${dt.getDate()}`
     );
 
-    const request = $derived.by(async () => {
-        // const res = await fetch(`${baseUrl}/${dtString}`);
+    const request = $derived.by(async () => 
+    {           
         let medRecord: MedRecord;           
         const res = await fetch(`${baseUrl}`, 
         {
@@ -29,25 +29,22 @@
             {
               'Content-Type': 'application/json',
               'X-DandlandOnly':'dandlandonly'
-            }
-            // body: JSON.stringify(medData)
+            }     
         });
-        console.log(`date ${dtString}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        record =await res.json() as MedRecord;
-        console.log(`datavalue == [${record.medDate}]`);
-        webDate= `${record.medDate.split('T')[0]}`;
-        console.log(`wdbDate == [${webDate}]`);        
-        console.table(record);
+                
+        if (!res.ok)
+        {
+            throw new Error(`HTTP ${res.status}`);            
+        } 
+        record =await res.json() as MedRecord;        
+        webDate= `${record.medDate?.split('T')[0]}`;      
         return record;
     });
     
     const valueChanged = async () =>
     {
-        console.log(`date changed  id == ${record?.id}`);
-        debugger;
         try 
-        {
+        {    
             let medData: MedRecord  = 
             {
                 description: record.description,
@@ -55,10 +52,8 @@
                 medDate: record.medDate,
                 am:record.am,
                 pm:record.pm               
-            }
-            
-            console.table(medData);
-            
+            }          
+              
             const response = await fetch(`${baseUrl}`, 
             {
                 method: 'PUT',
@@ -73,8 +68,7 @@
             });
                     
             if (response.ok) 
-            {
-                console.log('Update successful!');
+            {                
                 record = medData;
             }
             else 
@@ -87,44 +81,56 @@
             console.error('Network error:', error);
         }
       }
-      
-        const dateChange = async() =>
-        {            
-            console.log(`webdate changed... [${webDate}]`);
-            // const res = await fetch(`${baseUrl}/${webDate}`);
-                     
-            const res = await fetch(`${baseUrl}`, 
+  
+        const dateChange = async () => 
+        {
+            // 1. Fix the URL (added the slash)
+            const res = await fetch(`${baseUrl}/${webDate}`, 
             {
-                method: 'PUT',
-                //mode: 'cors', // This is the default; it tells the browser to check for CORS headers
-                // credentials: 'include', // Use this if you need to send cookies or Windows Auth                
+                method: 'GET', // Should this be GET? Usually fetching a record by date is GET
                 headers: 
                 {
-                  'Content-Type': 'application/json',
-                  'X-DandlandOnly':'dandlandonly'
-                },
-                body: JSON.stringify(medData)
-            });
+                    'Content-Type': 'application/json',
+                    'X-DandlandOnly': 'dandlandonly'
+                }
+            });       
             
-            
-            console.log(`date ${dtString}`);
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            console.table(record);
-            let tmpRecord:MedRecord =await res.json() as MedRecord;
-            console.table(tmpRecord);                        
-            record.id  = tmpRecord.id;
-            record.description  = tmpRecord.description;
-            record.medDate  = tmpRecord.medDate;
-            record.am  = tmpRecord.am;
-            record.pm  = tmpRecord.pm;           
-            console.table(record);                       
-            console.log(`datavalue == [${record.medDate}]`);
-            webDate= `${record.medDate.split('T')[0]}`;
-            console.log(`webDate == [${webDate}]`);        
-            console.table(record);
-            debugger;
-            return record;
-        }
+            if (res.ok) 
+            {
+                const tmpRecord = await res.json();
+                // 2. Reassign the whole object to ensure Svelte sees the change
+                record = tmpRecord; 
+            }
+        };
+//        const dateChange = async() =>
+//        {          
+//            console.table(webDate);             
+//            const res = await fetch(`${baseUrl}/${webDate}`, 
+//            {
+//                method: 'PUT',
+//                //mode: 'cors', // This is the default; it tells the browser to check for CORS headers
+//                // credentials: 'include', // Use this if you need to send cookies or Windows Auth                
+//                headers: 
+//                {
+//                  'Content-Type': 'application/json',
+//                  'X-DandlandOnly':'dandlandonly'
+//                },
+//                body: JSON.stringify(medData)
+//            });            
+//                        
+//            if (!res.ok)
+//            {
+//                throw new Error(`HTTP ${res.status}`);                
+//            } 
+//            let tmpRecord:MedRecord =await res.json() as MedRecord;
+//            record.id  = tmpRecord.id;
+//            record.description  = tmpRecord.description;
+//            record.medDate  = tmpRecord?.medDate;
+//            record.am  = tmpRecord.am;
+//            record.pm  = tmpRecord.pm;           
+//            // webDate= `${record.medDate?.split('T')[0]}`;            
+//            return record;
+//        }
     
 </script>
 
